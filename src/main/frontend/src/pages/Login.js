@@ -35,7 +35,7 @@ function Login() {
       }
     } catch (err) {
       console.error('로그인 에러:', err);
-      if (err.response && err.response.data && err.response.data.message) {
+      if (err.response?.data?.message) {
         setError(err.response.data.message);
       } else {
         setError('로그인 중 오류가 발생했습니다. 다시 시도해주세요.');
@@ -43,13 +43,21 @@ function Login() {
     }
   };
 
-  // ✅ OAuth 로그인 경로로 이동
   const handleOAuthLogin = (provider) => {
     window.location.href = `http://localhost:4000/oauth2/authorization/${provider}`;
   };
 
   return (
     <div className="auth-wrapper">
+      {/* 중앙 상단 로고 */}
+      <h1 
+        className="logo-title" 
+        onClick={() => navigate('/')}
+        style={{ cursor: 'pointer' }}
+      >
+        공지봇
+      </h1>
+
       <h2>로그인</h2>
       <form onSubmit={handleSubmit}>
         <input 

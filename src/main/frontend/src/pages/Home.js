@@ -18,30 +18,30 @@ function Home() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // URL 파라미터에서 토큰 추출
     const params = new URLSearchParams(location.search);
     const accessToken = params.get('accessToken');
     const refreshToken = params.get('refreshToken');
 
-    // 토큰이 URL에 있으면 저장하고 URL 파라미터 정리
     if (accessToken) {
-      const tokens = {};
-      tokens.accessToken = accessToken;
-      if (refreshToken) tokens.refreshToken = refreshToken;
-      
-      // 토큰 저장
       setTokens(accessToken, refreshToken || '');
-      
-      // URL 파라미터 제거 (히스토리 상태 유지)
       navigate('/', { replace: true });
-      
-      // 로그인 상태 업데이트
       setIsLoggedIn(true);
     } else {
-      // 토큰이 URL에 없으면 로컬 스토리지 확인
       setIsLoggedIn(isAuthenticated());
     }
   }, [location, navigate]);
+
+  // 새로고침해도 started 상태 유지
+  useEffect(() => {
+    const startedFlag = localStorage.getItem('chatStarted');
+    if (startedFlag === 'true') {
+      setStarted(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('chatStarted', started.toString());
+  }, [started]);
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -51,7 +51,6 @@ function Home() {
     scrollToBottom();
   }, [chat, answer]);
 
-  // 질문을 서버에 전송하고 JSON 응답 받는 함수
   const sendQuestionToBackend = async (q) => {
     try {
       const response = await fetch('http://localhost:8000/api/chat', {
@@ -70,12 +69,14 @@ function Home() {
     }
   };
 
-  // 질문 제출 핸들러
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!question.trim()) return;
 
-    if (!started) setStarted(true);
+    if (!started) {
+      if (!isLoggedIn) return alert('로그인이 필요합니다.');
+      setStarted(true);
+    }
 
     setChat((prev) => [...prev, { type: 'question', text: question }]);
     const fullAnswer = await sendQuestionToBackend(question);
@@ -98,6 +99,12 @@ function Home() {
     }, 50);
   };
 
+  const handleSuggestion = (text) => {
+    if (!isLoggedIn) return alert('로그인이 필요합니다.');
+    setQuestion(text);
+    setStarted(true);
+  };
+
   return (
     <div className="main-wrapper">
       <Sidebar open={sidebarOpen} />
@@ -111,27 +118,30 @@ function Home() {
       <div className="content-container">
         <div className="content-inner">
           {!started ? (
-            <div className="home-container">
-              <div
-                className="message-box"
-                onClick={() => setStarted(true)}
-              >
-                <p>무엇을 알려드릴까요??</p>
+              <div className="home-container">
+                <div className="message-box" onClick={() => {
+                  if (!isLoggedIn) return alert('로그인이 필요합니다.');
+                  setStarted(true);
+                }}>
+                  <p>무엇을 알려드릴까요??</p>
+                </div>
               </div>
-            </div>
-          ) : (
+            ) : (
+              // 기존 채팅화면
+
             <div className="chat-container">
+              {isLoggedIn && <div className="welcome-msg">😊 환영합니다!</div>}
               <div className="chat-history">
                 {chat.map((item, index) => (
                   <div
                     key={index}
-                    className={`chat-bubble ${item.type === 'question' ? 'question' : 'answer'}`}
+                    className={`chat-bubble ${item.type}`}
                   >
                     {item.text}
                   </div>
                 ))}
                 {answer && loading && (
-                  <div className="chat-bubble answer pulse">{answer}</div>
+                  <div className="chat-bubble answer">{answer}</div>
                 )}
                 {loading && !answer && (
                   <div className="loading-text">답변 생성 중...</div>
@@ -139,18 +149,19 @@ function Home() {
                 <div ref={chatEndRef} />
               </div>
               <form onSubmit={handleSubmit} className="chat-form">
-                <input
-                  type="text"
+                <textarea
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
                   placeholder="질문을 입력하세요"
                   className="question-input"
-                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmit(e);
+                    }
+                  }}
                 />
-                <button
-                  type="submit"
-                  className="question-button"
-                >
+                <button type="submit" className="question-button">
                   질문
                 </button>
               </form>
